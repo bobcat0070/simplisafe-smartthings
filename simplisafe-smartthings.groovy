@@ -24,7 +24,7 @@ metadata {
 	definition (name: "SimpliSafe", namespace: "bobcat0070", author: "Felix Gorodishter") {
 		capability "Alarm"
 		capability "Polling"
-
+		capability "Presence Sensor"
 		command "home"
 		command "away"
 		command "off"
@@ -35,7 +35,7 @@ metadata {
 	}
 
 	tiles {
-		standardTile("alarmMode", "device.alarmMode", width: 2, height: 2,
+		standardTile("alarm", "device.alarm", width: 2, height: 2,
 					 canChangeIcon: true) {
 			state "Off", label: '${name}',
 				  icon: "st.security.alarm.off", backgroundColor: "#ffffff"
@@ -43,14 +43,16 @@ metadata {
 				  icon: "st.security.alarm.on", backgroundColor: "#00E6E6"
 			state "Away", label: '${name}',
 				  icon: "st.security.alarm.on", backgroundColor: "#E60000"
-				  
 		}
-		standardTile("refresh", "device.alarmMode", inactiveLabel: false, decoration: "flat") {
+		standardTile("presence", "device.presence", inactiveLabel: false, decoration: "flat") {
+			state "present", label:'${name}', icon: "st.Home.home2"
+			state "not present", label:'away', icon: "st.Transportation.transportation5"
+		}
+		standardTile("refresh", "device.alarm", inactiveLabel: false, decoration: "flat") {
 			state "default", action:"polling.poll", icon:"st.secondary.refresh"
 		}
-
-		main "alarmMode"
-		details(["alarmMode", "refresh"])
+		main "alarm"
+		details(["alarm", "presence", "refresh"])
 	}
 }
 
@@ -85,29 +87,29 @@ def both() {
 
 def poll() {
 	log.debug "Executing 'poll'"
-	// TODO: handle 'poll' command
-	
+
 	api('status', []) { response ->
 		log.debug "Status request $response.status $response.data"
 		
 		if (response.data.num_locations < 1) {
 			return
 		}
-		
-		
+
 		def locations = response.data.locations
 		def location = locations.keySet()[0]
-		log.debug location
 
 		def new_state = locations."$location".system_state
-		def old_state = device.currentValue("alarmMode")
+		def old_state = device.currentValue("alarm")
 		def state_changed = new_state != old_state
 		
-		log.debug new_state
-		log.debug old_state
+		def alarm_presence = ['Off':'present', 'Home':'present', 'Away':'not present']
+		def presence_state_changed = device.currentValue("presence") != alarm_presence.getAt(new_state)
+
 		log.debug state_changed
-				
-		sendEvent(name: 'alarmMode', value: new_state, displayed: state_changed, isStateChange: state_changed)
+		log.debug presence_state_changed
+
+		sendEvent(name: 'presence', value: alarm_presence.getAt(new_state), displayed: presence_state_changed, isStateChange: presence_state_changed)
+		sendEvent(name: 'alarm', value: new_state, displayed: state_changed, isStateChange: state_changed)
 	}
 }
 
